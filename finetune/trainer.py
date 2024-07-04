@@ -195,6 +195,8 @@ class CPMTrainer(Trainer):
         Return:
             `torch.Tensor`: The tensor with training loss on this batch.
         """
+        # TODO main training
+
         model.train()
         inputs = self._prepare_inputs(inputs)
 
