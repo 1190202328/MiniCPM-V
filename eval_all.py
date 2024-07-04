@@ -251,14 +251,42 @@ if __name__ == '__main__':
         'region_perception': [],
         'driving_suggestion': []
     }
+
+    region_i = 0
     for i in range(num_samples):
         print(f'evaluating [{i + 1}/{num_samples}]')
 
         msgs = []
         answer = None
-        for task_id, task_name in enumerate(task_list):
-            task_json = json.loads(task_list_json[task_id][i])
 
+        # 1. general_perception
+        task_id, task_name = 0, 'general_perception'
+        task_json = json.loads(task_list_json[task_id][i])
+        ori_img_name = task_json['image'].split('/')[-1].split('.')[0]
+
+        im_64 = img2base64(f"{data_img_root_dir}/{task_json['image']}")
+        # chat
+        if answer is not None:
+            msgs.append({"role": "assistant", "content": answer})
+        msgs.append({"role": "user", "content": task_json['question']})
+        input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
+        answer = chat_model.chat(input)
+        # save_ans
+        answer_list[task_name].append(answer)
+
+        # 2. region_perception
+        task_id, task_name = 1, 'region_perception'
+        while True:
+            try:
+                task_json = json.loads(task_list_json[task_id][region_i])
+            except IndexError:
+                break
+            img_name = task_json['image'].split('/')[-1].split('.')[0]
+            if img_name.find(ori_img_name) == -1:
+                # not found
+                break
+
+            region_i += 1
             im_64 = img2base64(f"{data_img_root_dir}/{task_json['image']}")
             # chat
             if answer is not None:
@@ -266,9 +294,22 @@ if __name__ == '__main__':
             msgs.append({"role": "user", "content": task_json['question']})
             input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
             answer = chat_model.chat(input)
-
             # save_ans
             answer_list[task_name].append(answer)
+
+        # 3. driving_suggestion
+        task_id, task_name = 2, 'driving_suggestion'
+        task_json = json.loads(task_list_json[task_id][i])
+
+        im_64 = img2base64(f"{data_img_root_dir}/{task_json['image']}")
+        # chat
+        if answer is not None:
+            msgs.append({"role": "assistant", "content": answer})
+        msgs.append({"role": "user", "content": task_json['question']})
+        input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
+        answer = chat_model.chat(input)
+        # save_ans
+        answer_list[task_name].append(answer)
 
     # dump ans
     task_list_json_dump = {
@@ -276,8 +317,10 @@ if __name__ == '__main__':
         'region_perception': [],
         'driving_suggestion': []
     }
-    for i in range(num_samples):
-        for task_id, task_name in enumerate(task_list):
+    for task_id, task_name in enumerate(task_list):
+        assert len(task_list_json[task_id]) == len(answer_list[task_name])
+
+        for i in range(len(answer_list[task_name])):
             task_json = json.loads(task_list_json[task_id][i])
             task_json['answer'] = answer_list[task_name][i]
             task_list_json_dump[task_name].append(json.dumps(task_json))
