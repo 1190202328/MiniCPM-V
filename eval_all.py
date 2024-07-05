@@ -225,11 +225,8 @@ if __name__ == '__main__':
 
     # fixed para
     save_dir = '/nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/ans'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    save_dir = f'{save_dir}/{model_path.split("/")[-1]}'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    save_dir = f'{save_dir}/{model_path.split("/")[-1]}/{split}'
+    os.makedirs(save_dir, exist_ok=True)
     data_ann_root_dir = '/nfs/ofs-902-1/object-detection/tangwenbo/vlm/data/CODA-LM'
     data_img_root_dir = '/nfs/ofs-902-1/object-detection/tangwenbo/vlm/data/'
     data_ann_dir = f'{data_ann_root_dir}/{split}/vqa_anno'
