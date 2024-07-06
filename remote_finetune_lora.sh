@@ -1,6 +1,9 @@
 #!/bin/bash
 
-GPUS_PER_NODE=1
+bash /nfs/volume-902-16/tangwenbo/s3_all.sh
+bash /nfs/ofs-902-1/object-detection/tangwenbo/ofs-vlm.sh
+
+GPUS_PER_NODE=8
 NNODES=1
 NODE_RANK=0
 MASTER_ADDR=localhost
@@ -20,7 +23,7 @@ DISTRIBUTED_ARGS="
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
-/home/luban/apps/miniconda3/envs/torch230/bin/torchrun $DISTRIBUTED_ARGS finetune.py \
+cd /nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/finetune && /home/luban/apps/miniconda3/envs/torch230/bin/torchrun $DISTRIBUTED_ARGS finetune.py \
   --model_name_or_path $MODEL \
   --llm_type $LLM_TYPE \
   --data_path $DATA \
