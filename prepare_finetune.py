@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 import shutil
 
 from tqdm import tqdm
@@ -8,7 +9,13 @@ from tqdm import tqdm
 random.seed(1234)
 
 
-def prepare_all_tasks(name='train_all_tasks'):
+def pre_process_answer(text):
+    # 清除空白符号
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+
+def prepare_all_tasks(name='train_all_tasks', eval_split='NEW_Mini'):
     # fixed para
     save_dir = '/nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/finetune_data'
     os.makedirs(save_dir, exist_ok=True)
@@ -21,7 +28,7 @@ def prepare_all_tasks(name='train_all_tasks'):
     if name.find('train') != -1:
         splits = ['Train', 'Val']
     elif name.find('eval') != -1:
-        splits = ['Mini']
+        splits = [eval_split]
     else:
         raise Exception
 
@@ -35,11 +42,6 @@ def prepare_all_tasks(name='train_all_tasks'):
             task_path = f'{data_ann_dir}/{t}.jsonl'
             with open(task_path, mode='r', encoding='utf-8') as f:
                 text_list = f.read().strip().split('\n')
-
-                if name.find('eval') != -1 and t == 'general_perception':
-                    # process error
-                    text_list = [text_list[0] + text_list[1]] + text_list[2:]
-
                 task_list_json.append(text_list)
 
         num_samples = len(task_list_json[0])
@@ -107,6 +109,27 @@ def prepare_all_tasks(name='train_all_tasks'):
     # dump ans
     with open(save_path, mode='w', encoding='utf-8') as f:
         f.write(json.dumps(json_samples))
+
+
+def check_finetune_data(json_path):
+    root_path = f'/nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/finetune_data'
+    json_path = f'{root_path}/{json_path}'
+    with open(json_path, mode='r', encoding='utf-8') as f:
+        json_data = json.loads(f.read())
+    id_dict = set()
+    for line in tqdm(json_data):
+        # check id
+        if line['id'] in id_dict:
+            raise Exception
+        # check image
+        if not os.path.exists(line['image']):
+            raise Exception
+        # check conversations
+        for conversation in line['conversations']:
+            if conversation['role'] not in ['user', 'assistant']:
+                raise Exception
+            if len(conversation['content']) < 10:
+                raise Exception
 
 
 def check_split_region_class(splits=None):
@@ -249,8 +272,12 @@ def split_val_test(splits, save_dir='/nfs/ofs-902-1/object-detection/tangwenbo/v
 
 
 if __name__ == '__main__':
-    # prepare_all_tasks(name='train_all_tasks')
-    # prepare_all_tasks(name='eval_all_tasks')
-
     # split_val_test(splits=['Val'], samples_per_category=10)
-    check_split_region_class(splits=['NEW_Mini'])
+    # check_split_region_class(splits=['NEW_Mini'])
+
+    prepare_all_tasks(name='train_all_tasks')
+    check_finetune_data(json_path='train_all_tasks.json')
+    prepare_all_tasks(name='eval_all_tasks')
+    check_finetune_data(json_path='eval_all_tasks.json')
+
+    pass
