@@ -211,7 +211,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="MiniCPM-V")
     parser.add_argument("--model_path", type=str,
                         default='/nfs/ofs-902-vlm/jiangjing/MiniCPM-Llama3-V-2_5/official_ckpts')
-    parser.add_argument("--split", type=str, default='ROOT_TO_GT', choices=['ROOT_TO_GT', 'Test'])
+    parser.add_argument("--split", type=str, default='ROOT_TO_GT', choices=['ROOT_TO_GT', 'Test', 'NEW_Mini'])
 
     return parser.parse_args()
 
