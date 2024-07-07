@@ -9,6 +9,7 @@ NODE_RANK=0
 MASTER_ADDR=localhost
 MASTER_PORT=6001
 
+OUTPUT_DIR=$1
 MODEL="/nfs/ofs-902-vlm/jiangjing/MiniCPM-Llama3-V-2_5/official_ckpts" # or openbmb/MiniCPM-V-2
 # ATTENTION: specify the path to your training data, which should be a json file consisting of a list of conversations.
 # See the section for finetuning in README for more information.
@@ -33,8 +34,8 @@ cd /nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/finetune && /
   --prediction_loss_only false \
   --bf16 false \
   --bf16_full_eval false \
-  --fp16 false \
-  --fp16_full_eval false \
+  --fp16 true \
+  --fp16_full_eval true \
   --do_train \
   --do_eval \
   --tune_vision true \
@@ -45,8 +46,8 @@ cd /nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/finetune && /
   --max_slice_nums 9 \
   --max_steps 10000 \
   --eval_steps 1000 \
-  --output_dir output/output_minicpmv2_lora \
-  --logging_dir output/output_minicpmv2_lora \
+  --output_dir "output/${OUTPUT_DIR}" \
+  --logging_dir "output/${OUTPUT_DIR}" \
   --logging_strategy "steps" \
   --per_device_train_batch_size 2 \
   --per_device_eval_batch_size 1 \
