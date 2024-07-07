@@ -202,6 +202,39 @@ class MiniCPMVChat:
         return self.model.chat(input)
 
 
+def determine_position(center, w=1280, h=720, center_rate=0.25):
+    center_x, center_y = center
+    center_w, center_h = int(w * center_rate), int(h * center_rate)
+
+    center_x_rect = w / 2
+    center_y_rect = h / 2
+
+    # 确定中部区域的边界
+    mid_left = center_x_rect - center_w / 2
+    mid_right = center_x_rect + center_w / 2
+    mid_top = center_y_rect - center_h / 2
+    mid_bottom = center_y_rect + center_h / 2
+
+    # 判断是否在中部区域
+    if mid_left <= center_x <= mid_right and mid_top <= center_y <= mid_bottom:
+        return 'center'
+    else:
+        # 判断水平位置
+        if center_x > mid_right:
+            horizontal = 'right'
+        else:
+            horizontal = 'left'
+
+        # 判断垂直位置
+        if center_y > mid_bottom:
+            vertical = 'down'
+        else:
+            vertical = 'top'
+
+        # 组合水平和垂直位置
+        return f'{horizontal} {vertical}'
+
+
 def get_arguments():
     """Parse all the arguments provided from the CLI.
 
@@ -212,6 +245,7 @@ def get_arguments():
     parser.add_argument("--model_path", type=str,
                         default='/nfs/ofs-902-vlm/jiangjing/MiniCPM-Llama3-V-2_5/official_ckpts')
     parser.add_argument("--split", type=str, default='ROOT_TO_GT', choices=['ROOT_TO_GT', 'Test', 'NEW_Mini'])
+    parser.add_argument("--provide_bbox", action='store_true')
 
     return parser.parse_args()
 
@@ -220,20 +254,23 @@ if __name__ == '__main__':
     args = get_arguments()
 
     # changeable para
+    DEV_MODE = False
     model_path = args.model_path
     split = args.split
+    provide_bbox = args.provide_bbox
 
     # fixed para
+    answer_keys = {'question_id', 'image', 'question', 'answer'}
     save_dir = '/nfs/ofs-902-1/object-detection/jiangjing/experiments/MiniCPM-V/ans'
     save_dir = f'{save_dir}/{model_path.split("/")[-1]}/{split}'
-    os.makedirs(save_dir, exist_ok=True)
     data_ann_root_dir = '/nfs/ofs-902-1/object-detection/tangwenbo/vlm/data/CODA-LM'
     data_img_root_dir = '/nfs/ofs-902-1/object-detection/tangwenbo/vlm/data/'
     data_ann_dir = f'{data_ann_root_dir}/{split}/vqa_anno'
     task_list = ['general_perception', 'region_perception', 'driving_suggestion']
 
     # load model
-    chat_model = MiniCPMVChat(model_path)
+    if not DEV_MODE:
+        chat_model = MiniCPMVChat(model_path)
 
     # start chat
     task_list_json = []
@@ -267,7 +304,8 @@ if __name__ == '__main__':
             msgs.append({"role": "assistant", "content": answer})
         msgs.append({"role": "user", "content": task_json['question']})
         input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
-        answer = chat_model.chat(input)
+        if not DEV_MODE:
+            answer = chat_model.chat(input)
         # save_ans
         answer_list[task_name].append(answer)
 
@@ -288,9 +326,20 @@ if __name__ == '__main__':
             # chat
             if answer is not None:
                 msgs.append({"role": "assistant", "content": answer})
-            msgs.append({"role": "user", "content": task_json['question']})
+
+            if provide_bbox:
+                question = task_json['question']
+                bbox = task_json['bbox']
+                center = [bbox[0] + bbox[2] // 2, bbox[1] + bbox[3] // 2]
+                location = determine_position(center)
+                question += f' Note that the red rectangle is at the {location} of the provided image, exact rectangle with [x, y, width, height] = {bbox}.'
+            else:
+                question = task_json['question']
+
+            msgs.append({"role": "user", "content": question})
             input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
-            answer = chat_model.chat(input)
+            if not DEV_MODE:
+                answer = chat_model.chat(input)
             # save_ans
             answer_list[task_name].append(answer)
 
@@ -304,7 +353,8 @@ if __name__ == '__main__':
             msgs.append({"role": "assistant", "content": answer})
         msgs.append({"role": "user", "content": task_json['question']})
         input = {"image": im_64, "question": json.dumps(msgs, ensure_ascii=True)}
-        answer = chat_model.chat(input)
+        if not DEV_MODE:
+            answer = chat_model.chat(input)
         # save_ans
         answer_list[task_name].append(answer)
 
@@ -320,8 +370,15 @@ if __name__ == '__main__':
         for i in range(len(answer_list[task_name])):
             task_json = json.loads(task_list_json[task_id][i])
             task_json['answer'] = answer_list[task_name][i]
-            task_list_json_dump[task_name].append(json.dumps(task_json))
 
+            # only answer keys are dumped
+            new_task_json = {}
+            for key in task_json:
+                if key in answer_keys:
+                    new_task_json[key] = task_json[key]
+            task_list_json_dump[task_name].append(json.dumps(new_task_json))
+
+    os.makedirs(save_dir, exist_ok=True)
     for task_name in task_list:
         save_path = f'{save_dir}/{task_name}_answer.jsonl'
         with open(save_path, mode='w', encoding='utf-8') as f:
