@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import os
+from pprint import pprint
 
 import torch
 from PIL import Image
@@ -253,6 +254,8 @@ def get_arguments():
 if __name__ == '__main__':
     args = get_arguments()
 
+    pprint(args)
+
     # changeable para
     DEV_MODE = False
     model_path = args.model_path
@@ -332,7 +335,8 @@ if __name__ == '__main__':
                 bbox = task_json['bbox']
                 center = [bbox[0] + bbox[2] // 2, bbox[1] + bbox[3] // 2]
                 location = determine_position(center)
-                question += f' Note that the red rectangle is at the {location} of the provided image, exact rectangle with [x, y, width, height] = {bbox}.'
+                question += f' Note that the red rectangle is roughly located at the {location} of the provided image.'
+                # exact rectangle with [x, y, width, height] = {bbox}.
             else:
                 question = task_json['question']
 
