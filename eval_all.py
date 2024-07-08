@@ -8,6 +8,7 @@ from pprint import pprint
 import torch
 from PIL import Image
 from accelerate import load_checkpoint_and_dispatch, init_empty_weights
+from peft import AutoPeftModelForCausalLM
 from transformers import AutoTokenizer, AutoModel
 
 from omnilmm.model.omnilmm import OmniLMMForCausalLM
@@ -190,12 +191,46 @@ class MiniCPMV2_5:
         return answer
 
 
+class MiniCPMV2_5_finetuned:
+    def __init__(self, model_path) -> None:
+        self.model = AutoPeftModelForCausalLM.from_pretrained(
+            model_path,
+            device_map="auto",
+            trust_remote_code=True
+        )
+        vpm_resampler_embedtokens_weight = torch.load(f"{model_path}/vpm_resampler_embedtokens.pt")
+        msg = self.model.load_state_dict(vpm_resampler_embedtokens_weight, strict=False)
+        print(msg)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        self.model.eval().cuda()
+
+    def chat(self, input):
+        try:
+            image = Image.open(io.BytesIO(base64.b64decode(input['image']))).convert('RGB')
+        except Exception as e:
+            return "Image decode error"
+
+        msgs = json.loads(input['question'])
+
+        answer = self.model.chat(
+            image=image,
+            msgs=msgs,
+            tokenizer=self.tokenizer,
+            sampling=True,
+            temperature=0.7
+        )
+        return answer
+
+
 class MiniCPMVChat:
     def __init__(self, model_path) -> None:
         if '12B' in model_path:
             self.model = OmniLMM12B(model_path)
         elif 'MiniCPM-Llama3-V' in model_path:
             self.model = MiniCPMV2_5(model_path)
+        elif 'finetune' in model_path:
+            self.model = MiniCPMV2_5_finetuned(model_path)
         else:
             self.model = MiniCPMV(model_path)
 
@@ -246,7 +281,7 @@ def get_arguments():
     parser.add_argument("--model_path", type=str,
                         default='/nfs/ofs-902-vlm/jiangjing/MiniCPM-Llama3-V-2_5/official_ckpts')
     parser.add_argument("--split", type=str, default='ROOT_TO_GT', choices=['ROOT_TO_GT', 'Test', 'NEW_Mini'])
-    parser.add_argument("--provide_bbox", action='store_true')
+    parser.add_argument("--provide_bbox", type=int, choices=[0, 1])
 
     return parser.parse_args()
 
@@ -260,7 +295,7 @@ if __name__ == '__main__':
     DEV_MODE = False
     model_path = args.model_path
     split = args.split
-    provide_bbox = args.provide_bbox
+    provide_bbox = args.provide_bbox == 1
 
     # fixed para
     answer_keys = {'question_id', 'image', 'question', 'answer'}
